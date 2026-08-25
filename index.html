@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Money Tracker</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Lora:wght@500;600;700&family=Manrope:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <section id="authScreen" class="auth-screen">
+      <div class="auth-card">
+        <p class="eyebrow">Personal Finance</p>
+        <h1>Money Tracker</h1>
+        <p class="auth-copy">Log in to keep your own transactions, categories, and budget together.</p>
+        <form id="authForm">
+          <div class="field-group">
+            <label for="authUsername">Email address</label>
+            <input id="authUsername" type="email" autocomplete="email" required />
+          </div>
+          <div class="field-group">
+            <label for="authPassword">Password</label>
+            <input id="authPassword" type="password" minlength="4" autocomplete="current-password" required />
+          </div>
+          <p id="authMessage" class="auth-message" aria-live="polite"></p>
+          <button id="authSubmitBtn" class="primary-btn" type="submit">Log In</button>
+        </form>
+        <button id="authModeBtn" class="link-btn" type="button">Create a new account</button>
+      </div>
+    </section>
+
+    <div id="appShell" class="container hidden">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Personal Finance</p>
+          <h1>Money Tracker</h1>
+          <p id="userGreeting" class="user-greeting"></p>
+        </div>
+        <div class="topbar-actions">
+          <button id="logoutBtn" class="secondary-btn" type="button">Log Out</button>
+        </div>
+      </header>
+
+      <nav class="app-tabs" aria-label="Main navigation">
+        <button class="app-tab active" data-tab="dashboard" type="button">Dashboard</button>
+        <button class="app-tab" data-tab="transactions" type="button">Transactions</button>
+        <button class="app-tab" data-tab="goals" type="button">Goals</button>
+        <button class="app-tab" data-tab="settings" type="button">Settings</button>
+      </nav>
+
+      <section id="dashboardToolbar" class="toolbar panel tab-content dashboard-content">
+        <div class="field-group compact-field">
+          <label for="monthFilter">View month</label>
+          <input id="monthFilter" type="month" />
+        </div>
+        <div class="field-group compact-field">
+          <label for="budgetInput">Monthly expense budget</label>
+          <input id="budgetInput" type="number" min="0" step="0.01" placeholder="Set budget" />
+        </div>
+        <div class="budget-status">
+          <div class="budget-label"><span>Budget used</span><strong id="budgetStatus">No budget set</strong></div>
+          <div class="progress-track"><div id="budgetProgress" class="progress-bar"></div></div>
+        </div>
+      </section>
+
+      <details class="theme-panel panel tab-content settings-content">
+        <summary class="collapsible-summary">
+          <div>
+            <p class="eyebrow">Personalize</p>
+            <h3>Theme Settings</h3>
+          </div>
+          <span class="summary-chevron">+</span>
+        </summary>
+        <div class="collapsible-content">
+          <div class="theme-actions">
+            <div class="theme-presets" aria-label="Theme presets">
+              <button class="theme-preset" data-theme="classic" type="button">Classic Teal</button>
+              <button class="theme-preset" data-theme="blush" type="button">Blush</button>
+              <button class="theme-preset" data-theme="mono" type="button">Silver Mono</button>
+            </div>
+            <button id="resetThemeBtn" class="secondary-btn" type="button">Reset</button>
+          </div>
+          <div class="color-controls">
+            <label>Accent <input id="accentColor" type="color" /></label>
+            <label>Background <input id="backgroundColor" type="color" /></label>
+            <label>Surface <input id="surfaceColor" type="color" /></label>
+            <label>Text <input id="textColor" type="color" /></label>
+          </div>
+          <div class="font-control field-group">
+            <label for="fontSelect">Font style</label>
+            <select id="fontSelect">
+              <option value="dm">DM Sans + Space Grotesk</option>
+              <option value="manrope">Manrope + Plus Jakarta Sans</option>
+              <option value="editorial">DM Sans + Lora</option>
+            </select>
+          </div>
+        </div>
+      </details>
+
+      <details class="data-panel panel tab-content settings-content">
+        <summary class="collapsible-summary">
+          <div>
+            <p class="eyebrow">Your data</p>
+            <h3>Data &amp; Backup</h3>
+          </div>
+          <span class="summary-chevron">+</span>
+        </summary>
+        <div class="collapsible-content">
+          <p class="data-note">Keep a copy before changing devices.</p>
+          <div class="data-actions">
+            <button id="exportBtn" class="secondary-btn" title="Download transactions as a spreadsheet" type="button">Export CSV</button>
+            <button id="backupBtn" class="secondary-btn" title="Save a complete Money Tracker backup" type="button">Backup JSON</button>
+            <button id="importBtn" class="secondary-btn" title="Restore a Money Tracker JSON backup" type="button">Import JSON</button>
+            <button id="clearAllBtn" class="danger-btn" title="Delete all transaction history" type="button">Clear All Records</button>
+            <input id="importFile" type="file" accept="application/json" hidden />
+          </div>
+        </div>
+      </details>
+
+      <section id="dashboardSummary" class="summary-grid tab-content dashboard-content">
+        <div class="card income-card">
+          <p>Total Income</p>
+          <h2 id="incomeTotal">₱0.00</h2>
+        </div>
+        <div class="card expense-card">
+          <p>Total Expense</p>
+          <h2 id="expenseTotal">₱0.00</h2>
+        </div>
+        <div class="card balance-card">
+          <p>Balance</p>
+          <h2 id="balanceTotal">₱0.00</h2>
+        </div>
+      </section>
+
+      <section id="dashboardBreakdown" class="panel breakdown-panel tab-content dashboard-content">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">Spending overview</p>
+            <h3>Expenses by Category</h3>
+          </div>
+          <span id="categoryExpenseTotal" class="breakdown-total">₱0.00</span>
+        </div>
+        <div id="categoryBreakdown" class="category-breakdown"></div>
+      </section>
+
+      <main class="content-grid tab-content transactions-content">
+        <div class="left-column">
+          <section class="panel form-panel tab-section transactions-content">
+            <h3 id="formTitle">Add Transaction</h3>
+            <form id="transactionForm">
+              <div class="field-group">
+                <label for="type">Type</label>
+                <select id="type" name="type">
+                  <option value="income">Income</option>
+                  <option value="expense">Expense</option>
+                </select>
+              </div>
+
+              <div class="field-group">
+                <label for="category">Category</label>
+                <select id="category" name="category" required></select>
+              </div>
+
+              <div class="field-group">
+                <label for="amount">Amount</label>
+                <input id="amount" name="amount" type="number" min="0.01" step="0.01" placeholder="0.00" required />
+              </div>
+
+              <div class="field-group">
+                <label for="date">Date</label>
+                <input id="date" name="date" type="date" required />
+              </div>
+
+              <div class="field-group">
+                <label for="note">Note</label>
+                <input id="note" name="note" type="text" placeholder="Optional note" />
+              </div>
+
+              <div class="field-group">
+                <label for="frequency">Repeat</label>
+                <select id="frequency" name="frequency">
+                  <option value="once">One time</option>
+                  <option value="monthly">Monthly</option>
+                </select>
+              </div>
+
+              <div class="form-actions">
+                <button id="submitBtn" class="primary-btn" type="submit">Add Record</button>
+                <button id="cancelEditBtn" class="secondary-btn hidden" type="button">Cancel Edit</button>
+              </div>
+            </form>
+          </section>
+
+          <section class="panel category-panel tab-section settings-content">
+            <h3>Manage Categories</h3>
+            <div class="category-form">
+              <input id="newCategoryInput" type="text" placeholder="Add custom category" />
+              <button id="addCategoryBtn" class="secondary-btn" type="button">Add</button>
+            </div>
+            <div id="categoryList" class="category-list"></div>
+          </section>
+
+          <section class="panel goal-panel tab-section goals-content">
+            <h3>Savings Goals</h3>
+            <form id="goalForm" class="goal-form">
+              <input id="goalName" type="text" placeholder="Goal name" required />
+              <input id="goalTarget" type="number" min="1" step="0.01" placeholder="Target amount" required />
+              <input id="goalSaved" type="number" min="0" step="0.01" placeholder="Already saved" required />
+              <button class="secondary-btn" type="submit">Add Goal</button>
+            </form>
+            <div id="goalList" class="goal-list"></div>
+          </section>
+        </div>
+
+        <section class="panel list-panel tab-section transactions-content">
+          <div class="panel-header">
+            <h3>Transaction History</h3>
+          </div>
+          <div id="transactionList" class="transaction-list"></div>
+        </section>
+      </main>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
+    <script src="script.js"></script>
+  </body>
+</html>
