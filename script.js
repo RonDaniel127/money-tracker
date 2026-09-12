@@ -162,17 +162,25 @@ async function loadCloudData() {
 async function showApp() {
   authScreen.classList.add('hidden');
   appShell.classList.remove('hidden');
-  userGreeting.textContent = `Logged in as ${currentEmail}`;
+  const isGuestMode = currentUser === 'guest';
+  userGreeting.textContent = isGuestMode
+    ? 'Portfolio preview · stored locally in this browser'
+    : `Logged in as ${currentEmail}`;
+  logoutBtn.textContent = isGuestMode ? 'Log In' : 'Log Out';
   records = loadRecords();
   categories = loadCategories();
   goals = loadGoals();
   budgetInput.value = localStorage.getItem(getBudgetKey()) || '';
-  try {
+  if (isGuestMode) {
+    setSyncStatus('Local preview');
+  } else {
+    try {
     await loadCloudData();
     addMissingMonthlyRecords();
-  } catch (error) {
-    console.error('Cloud data could not be loaded:', error);
-    setSyncStatus(`Cloud sync failed: ${error.message || 'check Supabase permissions.'}`, true);
+    } catch (error) {
+      console.error('Cloud data could not be loaded:', error);
+      setSyncStatus(`Cloud sync failed: ${error.message || 'check Supabase permissions.'}`, true);
+    }
   }
   loadTheme();
   loadFont();
@@ -861,6 +869,10 @@ authForm.addEventListener('submit', async (event) => {
 });
 
 logoutBtn.addEventListener('click', async () => {
+  if (currentUser === 'guest') {
+    showAuth();
+    return;
+  }
   await supabaseClient.auth.signOut();
   currentUser = null;
   currentEmail = '';
@@ -892,6 +904,8 @@ async function initializeAuth() {
       currentEmail = data.session.user.email || '';
       showApp();
     } else {
+      currentUser = 'guest';
+      currentEmail = 'Guest user';
       showApp();
     }
   } catch (error) {
