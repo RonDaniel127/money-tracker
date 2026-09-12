@@ -71,6 +71,8 @@ let categories = loadCategories();
 let goals = loadGoals();
 let editingId = null;
 let isRegisterMode = false;
+let knownCloudRecordIds = new Set();
+let recordsSaveQueue = Promise.resolve();
 
 function setActiveTab(tabName) {
   document.querySelectorAll('.tab-content, .tab-section').forEach((section) => {
@@ -144,6 +146,7 @@ async function loadCloudData() {
     frequency: record.frequency || 'once',
     recurrenceKey: record.recurrence_key || undefined,
   }));
+  knownCloudRecordIds = new Set(records.map((record) => String(record.id)));
   categories = cloudCategories?.map((category) => category.name) || [...DEFAULT_CATEGORIES];
   goals = (cloudGoals || []).map((goal) => ({ id: goal.id, name: goal.name, target: Number(goal.target), saved: Number(goal.saved) }));
 
@@ -275,12 +278,8 @@ function loadRecords() {
   }
 }
 
-async function saveRecords() {
-  localStorage.setItem(getUserKey(STORAGE_KEY), JSON.stringify(records));
-  if (!currentUser) return;
-  setSyncStatus('Saving...');
-  await supabaseClient.from('transactions').delete().eq('user_id', currentUser);
-  const { data, error } = await supabaseClient.from('transactions').insert(records.map((record) => ({
+function toCloudTransaction(record) {
+  return {
     user_id: currentUser,
     type: record.type,
     category: record.category,
@@ -289,15 +288,82 @@ async function saveRecords() {
     note: record.note || null,
     frequency: record.frequency || 'once',
     recurrence_key: record.recurrenceKey || null,
-  }))).select();
+  };
+}
+
+async function persistRecords() {
+  localStorage.setItem(getUserKey(STORAGE_KEY), JSON.stringify(records));
+  if (!currentUser) return;
+
+  setSyncStatus('Saving...');
+  const currentCloudIds = new Set();
+  const recordsToInsert = [];
+  const recordsToUpdate = [];
+
+  records.forEach((record) => {
+    const recordId = String(record.id);
+    if (/^\d+$/.test(recordId)) {
+      currentCloudIds.add(recordId);
+      recordsToUpdate.push(record);
+    } else {
+      recordsToInsert.push(record);
+    }
+  });
+
+  const deletedIds = [...knownCloudRecordIds].filter((id) => !currentCloudIds.has(id));
+  const [insertResult, updateResults, deleteResult] = await Promise.all([
+    recordsToInsert.length
+      ? supabaseClient.from('transactions').insert(recordsToInsert.map(toCloudTransaction)).select()
+      : Promise.resolve({ data: [], error: null }),
+    Promise.all(recordsToUpdate.map((record) => (
+      supabaseClient
+        .from('transactions')
+        .update(toCloudTransaction(record))
+        .eq('id', record.id)
+        .eq('user_id', currentUser)
+        .select()
+        .single()
+    ))),
+    deletedIds.length
+      ? supabaseClient.from('transactions').delete().in('id', deletedIds).eq('user_id', currentUser)
+      : Promise.resolve({ error: null }),
+  ]);
+
+  const updateError = updateResults.find((result) => result.error)?.error;
+  const error = insertResult.error || updateError || deleteResult.error;
   if (error) {
     setSyncStatus('Sync failed. Your local copy is safe.', true);
     throw error;
   }
-  if (data) {
-    records = data.map((record) => ({ ...record, date: record.transaction_date, amount: Number(record.amount) }));
-  }
+
+  const insertedRecords = (insertResult.data || []).map((record) => ({
+    id: record.id,
+    type: record.type,
+    category: record.category,
+    amount: Number(record.amount),
+    date: record.transaction_date,
+    note: record.note || '',
+    frequency: record.frequency || 'once',
+    recurrenceKey: record.recurrence_key || undefined,
+  }));
+
+  const insertedByLocalId = new Map();
+  recordsToInsert.forEach((localRecord, index) => {
+    const insertedRecord = insertedRecords[index];
+    if (insertedRecord) {
+      insertedByLocalId.set(String(localRecord.id), insertedRecord);
+    }
+  });
+  records = records.map((record) => insertedByLocalId.get(String(record.id)) || record);
+  deletedIds.forEach((id) => knownCloudRecordIds.delete(id));
+  insertedRecords.forEach((record) => knownCloudRecordIds.add(String(record.id)));
+  localStorage.setItem(getUserKey(STORAGE_KEY), JSON.stringify(records));
   setSyncStatus('Synced');
+}
+
+function saveRecords() {
+  recordsSaveQueue = recordsSaveQueue.then(persistRecords, persistRecords);
+  return recordsSaveQueue;
 }
 
 function addMissingMonthlyRecords() {
