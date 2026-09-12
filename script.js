@@ -897,23 +897,11 @@ async function initializeAuth() {
     return;
   }
 
-  try {
-    const { data } = await supabaseClient.auth.getSession();
-    if (data.session?.user) {
-      currentUser = data.session.user.id;
-      currentEmail = data.session.user.email || '';
-      showApp();
-    } else {
-      currentUser = 'guest';
-      currentEmail = 'Guest user';
-      showApp();
-    }
-  } catch (error) {
-    console.warn('Supabase session unavailable, using guest mode:', error);
-    currentUser = 'guest';
-    currentEmail = 'Guest user';
-    showApp();
-  }
+  // Keep the public portfolio view as the default. Users enter private
+  // synced mode explicitly through the Log In button.
+  currentUser = 'guest';
+  currentEmail = 'Guest user';
+  showApp();
 }
 
 initializeAuth();
