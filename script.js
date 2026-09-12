@@ -169,7 +169,7 @@ async function showApp() {
     addMissingMonthlyRecords();
   } catch (error) {
     console.error('Cloud data could not be loaded:', error);
-    setSyncStatus('Cloud sync failed. Local data only.', true);
+    setSyncStatus(`Cloud sync failed: ${error.message || 'check Supabase permissions.'}`, true);
   }
   loadTheme();
   loadFont();
