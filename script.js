@@ -43,6 +43,7 @@ const authMessage = document.getElementById('authMessage');
 const authSubmitBtn = document.getElementById('authSubmitBtn');
 const authModeBtn = document.getElementById('authModeBtn');
 const userGreeting = document.getElementById('userGreeting');
+const syncStatus = document.getElementById('syncStatus');
 const logoutBtn = document.getElementById('logoutBtn');
 const tabButtons = document.querySelectorAll('.app-tab');
 const goalForm = document.getElementById('goalForm');
@@ -112,6 +113,11 @@ function setAuthMessage(message, isError = false) {
   authMessage.classList.toggle('error', isError);
 }
 
+function setSyncStatus(message, isError = false) {
+  syncStatus.textContent = message;
+  syncStatus.classList.toggle('error', isError);
+}
+
 function showAuth() {
   authScreen.classList.remove('hidden');
   appShell.classList.add('hidden');
@@ -147,6 +153,7 @@ async function loadCloudData() {
     .eq('month', `${monthFilter.value}-01`)
     .maybeSingle();
   budgetInput.value = cloudBudget ? cloudBudget.amount : '';
+  setSyncStatus('Synced');
 }
 
 async function showApp() {
@@ -162,7 +169,7 @@ async function showApp() {
     addMissingMonthlyRecords();
   } catch (error) {
     console.error('Cloud data could not be loaded:', error);
-    setAuthMessage('Online data could not be loaded. Local fallback is active.', true);
+    setSyncStatus('Cloud sync failed. Local data only.', true);
   }
   loadTheme();
   loadFont();
@@ -271,8 +278,9 @@ function loadRecords() {
 async function saveRecords() {
   localStorage.setItem(getUserKey(STORAGE_KEY), JSON.stringify(records));
   if (!currentUser) return;
+  setSyncStatus('Saving...');
   await supabaseClient.from('transactions').delete().eq('user_id', currentUser);
-  const { data } = await supabaseClient.from('transactions').insert(records.map((record) => ({
+  const { data, error } = await supabaseClient.from('transactions').insert(records.map((record) => ({
     user_id: currentUser,
     type: record.type,
     category: record.category,
@@ -282,9 +290,14 @@ async function saveRecords() {
     frequency: record.frequency || 'once',
     recurrence_key: record.recurrenceKey || null,
   }))).select();
+  if (error) {
+    setSyncStatus('Sync failed. Your local copy is safe.', true);
+    throw error;
+  }
   if (data) {
     records = data.map((record) => ({ ...record, date: record.transaction_date, amount: Number(record.amount) }));
   }
+  setSyncStatus('Synced');
 }
 
 function addMissingMonthlyRecords() {
@@ -548,7 +561,7 @@ function render() {
   renderTransactions();
 }
 
-form.addEventListener('submit', (event) => {
+form.addEventListener('submit', async (event) => {
   event.preventDefault();
 
   const formData = new FormData(form);
@@ -571,7 +584,11 @@ form.addEventListener('submit', (event) => {
     records.push(updatedRecord);
   }
 
-  saveRecords();
+  try {
+    await saveRecords();
+  } catch (error) {
+    console.error('Could not save transaction:', error);
+  }
   resetForm();
   render();
 });
@@ -786,13 +803,36 @@ logoutBtn.addEventListener('click', async () => {
 });
 
 async function initializeAuth() {
-  const { data } = await supabaseClient.auth.getSession();
-  if (data.session?.user) {
-    currentUser = data.session.user.id;
-    currentEmail = data.session.user.email || '';
+  const hasValidSupabaseConfig = Boolean(
+    typeof window !== 'undefined' &&
+    window.supabase &&
+    SUPABASE_URL &&
+    SUPABASE_PUBLISHABLE_KEY &&
+    !SUPABASE_URL.includes('your-project') &&
+    !SUPABASE_PUBLISHABLE_KEY.includes('your_')
+  );
+
+  if (!hasValidSupabaseConfig) {
+    currentUser = 'guest';
+    currentEmail = 'Guest user';
     showApp();
-  } else {
-    showAuth();
+    return;
+  }
+
+  try {
+    const { data } = await supabaseClient.auth.getSession();
+    if (data.session?.user) {
+      currentUser = data.session.user.id;
+      currentEmail = data.session.user.email || '';
+      showApp();
+    } else {
+      showApp();
+    }
+  } catch (error) {
+    console.warn('Supabase session unavailable, using guest mode:', error);
+    currentUser = 'guest';
+    currentEmail = 'Guest user';
+    showApp();
   }
 }
 
